@@ -31,7 +31,7 @@
         .bounce-on-hover:hover svg {
             animation: bounce-icon 0.3s ease-in-out;
         }
-        /* Modal styles (kept for generic alerts, but property summary modal is removed) */
+        /* Modal styles */
         .modal {
             display: none; /* Hidden by default */
             position: fixed; /* Stay in place */
@@ -283,7 +283,28 @@
         </div>
     </footer>
 
-    <!-- Generic modal for alerts/confirmations (replaces alert()) -->
+    <!-- Modal for Property Submission Summary -->
+    <div id="propertySummaryModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h3 class="text-3xl font-bold text-gray-900 mb-6 text-center">Property Details Summary</h3>
+            <div id="summaryContent" class="text-lg text-gray-700 leading-relaxed mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <!-- Summary will be injected here -->
+            </div>
+            <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <button id="copySummaryBtn"
+                        class="bg-blue-600 text-white font-bold py-3 px-8 rounded-full text-lg shadow-md hover:bg-blue-700 transition-colors duration-300">
+                    Copy to Clipboard
+                </button>
+                <button id="closeModalBtn"
+                        class="bg-gray-300 text-gray-800 font-bold py-3 px-8 rounded-full text-lg shadow-md hover:bg-gray-400 transition-colors duration-300">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic modal for alerts/confirmations -->
     <div id="genericModal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
@@ -359,7 +380,11 @@ Please provide only the description, without any introductory or concluding rema
 
             // --- Property Submission Form Logic ---
             const propertySubmissionForm = document.getElementById('propertySubmissionForm');
-            // Removed propertySummaryModal, summaryContent, copySummaryBtn, closeModalBtn, closeButtonSpan related to the old modal
+            const propertySummaryModal = document.getElementById('propertySummaryModal'); // Re-added
+            const summaryContent = document.getElementById('summaryContent'); // Re-added
+            const copySummaryBtn = document.getElementById('copySummaryBtn'); // Re-added
+            const closeModalBtn = document.getElementById('closeModalBtn'); // Re-added
+            const closeButtonSpan = propertySummaryModal.querySelector('.close-button'); // Re-added
 
             propertySubmissionForm.addEventListener('submit', (event) => {
                 event.preventDefault(); // Prevent default form submission
@@ -378,7 +403,7 @@ Please provide only the description, without any introductory or concluding rema
                     return;
                 }
 
-                // Construct the email body
+                // Construct the email body for mailto and summary
                 let emailBody = `Property Details for Cash Offer Request:\n\n`;
                 emailBody += `Property Address: ${address}\n`;
                 emailBody += `Property Type: ${type}\n`;
@@ -396,20 +421,64 @@ Please provide only the description, without any introductory or concluding rema
                 const encodedSubject = encodeURIComponent(emailSubject);
                 const encodedBody = encodeURIComponent(emailBody);
 
-                // Construct the mailto link
+                // Attempt to open the email client
                 const mailtoLink = `mailto:${recipientEmail}?subject=${encodedSubject}&body=${encodedBody}`;
-
-                // Open the email client
                 window.location.href = mailtoLink;
 
-                // Optionally, show a success message after opening the email client
-                showModal('Email Client Opened', '<p class="text-green-600 font-semibold">Your email client should now be open with the property details. Please send the email!</p>');
+                // Display the summary in the modal as a fallback/confirmation
+                let summaryHtml = `
+                    <p><strong class="text-blue-700">Property Address:</strong> ${address}</p>
+                    <p><strong class="text-blue-700">Property Type:</strong> ${type}</p>
+                `;
+                if (beds) summaryHtml += `<p><strong class="text-blue-700">Number of Beds:</strong> ${beds}</p>`;
+                if (baths) summaryHtml += `<p><strong class="text-blue-700">Number of Baths:</strong> ${baths}</p>`;
+                summaryHtml += `<p><strong class="text-blue-700">Property Condition:</strong> ${condition}</p>`;
+                if (price) summaryHtml += `<p><strong class="text-blue-700">Desired Selling Price:</strong> ${price}</p>`;
+                if (comments) summaryHtml += `<p><strong class="text-blue-700">Additional Comments:</strong> ${comments}</p>`;
+
+                summaryContent.innerHTML = summaryHtml;
+                summaryContent.dataset.rawText = emailBody; // Store raw text for copying
+                propertySummaryModal.style.display = 'flex'; // Show the modal
 
                 // Reset the form after submission
                 propertySubmissionForm.reset();
             });
 
-            // Generic modal for alerts/confirmations (replaces alert())
+            // Close property summary modal functions
+            closeModalBtn.addEventListener('click', () => {
+                propertySummaryModal.style.display = 'none';
+            });
+            closeButtonSpan.addEventListener('click', () => {
+                propertySummaryModal.style.display = 'none';
+            });
+            window.addEventListener('click', (event) => {
+                if (event.target == propertySummaryModal) {
+                    propertySummaryModal.style.display = 'none';
+                }
+            });
+
+            // Copy to clipboard functionality (re-added)
+            copySummaryBtn.addEventListener('click', () => {
+                const textToCopy = summaryContent.dataset.rawText || summaryContent.innerText;
+                if (textToCopy) {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = textToCopy;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    try {
+                        document.execCommand('copy');
+                        showModal('Copied!', '<p class="text-green-600 font-semibold">Property details copied to clipboard!</p>');
+                    } catch (err) {
+                        showModal('Copy Failed', '<p class="text-red-600">Failed to copy. Please copy manually from the summary.</p>');
+                        console.error('Failed to copy text: ', err);
+                    } finally {
+                        document.body.removeChild(textarea);
+                        propertySummaryModal.style.display = 'none'; // Close summary modal after copying
+                    }
+                }
+            });
+
+            // Generic modal for alerts/confirmations
             const genericModal = document.createElement('div');
             genericModal.id = 'genericModal';
             genericModal.classList.add('modal');
